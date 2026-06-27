@@ -235,7 +235,7 @@ def api_analyze_session(
 def api_get_transactions(
     session_id: str,
     page: int = Query(default=1, ge=1),
-    limit: int = Query(default=50, ge=1, le=200),
+    limit: int = Query(default=50, ge=1, le=5000),
     category: Optional[str] = None,
     search: Optional[str] = None,
     fromDate: Optional[str] = Query(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$"),

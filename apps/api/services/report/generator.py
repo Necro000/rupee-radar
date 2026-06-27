@@ -1,10 +1,20 @@
 from typing import List, Dict, Any
 
-def generate_html_report(session_id: str, summary: Dict[str, Any], transactions: List[Any], insights: List[Dict[str, Any]]) -> str:
+def generate_html_report(session_id: str, summary: Dict[str, Any], transactions: List[Any], insights: List[Dict[str, Any]], from_date: str = None, to_date: str = None) -> str:
     """
     Compiles session summary data, transactions, and insights into a beautifully styled,
     standalone HTML document optimized for printing and PDF export.
     """
+    
+    if from_date and to_date:
+        period_label = f"{from_date} to {to_date}"
+    elif from_date:
+        period_label = f"From {from_date}"
+    elif to_date:
+        period_label = f"Until {to_date}"
+    else:
+        period_label = "All Time Data"
+
     
     # Formatter helpers
     def fmt_currency(val: float) -> str:
@@ -44,20 +54,24 @@ def generate_html_report(session_id: str, summary: Dict[str, Any], transactions:
             border_color = "#34d399"  # green
         
         insights_html += f"""
-        <div style="border-left: 4px solid {border_color}; background-color: #f9fafb; padding: 14px 18px; border-radius: 6px; margin-bottom: 12px;">
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 4px;">
-                <tr>
-                    <td style="font-size: 11px; text-transform: uppercase; font-weight: 800; color: #6b7280; letter-spacing: 0.05em; text-align: left; padding: 0;">
-                        {ins.get('type', 'INSIGHT').replace('_', ' ')}
-                    </td>
-                    <td style="font-size: 10px; color: #9ca3af; text-align: right; padding: 0;">
-                        Relevance: {ins.get('relevance', 0.5):.2f}
-                    </td>
-                </tr>
-            </table>
-            <h4 style="margin: 0 0 6px 0; font-size: 14px; font-weight: 700; color: #111827;">{ins['title']}</h4>
-            <p style="margin: 0; font-size: 12px; color: #4b5563; line-height: 1.5;">{ins['text']}</p>
-        </div>
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 12px; background-color: #f9fafb; border: 1px solid #e5e7eb; border-left: 4px solid {border_color};">
+            <tr>
+                <td style="padding: 12px 16px;">
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 4px;">
+                        <tr>
+                            <td style="font-size: 11px; text-transform: uppercase; font-weight: 800; color: #6b7280; letter-spacing: 0.05em; text-align: left; padding: 0; border: none; background: none;">
+                                {ins.get('type', 'INSIGHT').replace('_', ' ')}
+                            </td>
+                            <td style="font-size: 10px; color: #9ca3af; text-align: right; padding: 0; border: none; background: none;">
+                                Relevance: {ins.get('relevance', 0.5):.2f}
+                            </td>
+                        </tr>
+                    </table>
+                    <div style="font-size: 14px; font-weight: 700; color: #111827; margin: 0 0 6px 0; padding: 0;">{ins['title']}</div>
+                    <div style="font-size: 12px; color: #4b5563; line-height: 1.5; margin: 0; padding: 0;">{ins['text']}</div>
+                </td>
+            </tr>
+        </table>
         """
 
     # Render transactions rows
@@ -225,6 +239,7 @@ def generate_html_report(session_id: str, summary: Dict[str, Any], transactions:
             </div>
             <div class="meta">
                 <div><strong>Session ID:</strong> {session_id}</div>
+                <div><strong>Period:</strong> {period_label}</div>
                 <div><strong>Format:</strong> HTML Export</div>
             </div>
         </div>
@@ -286,16 +301,20 @@ def generate_html_report(session_id: str, summary: Dict[str, Any], transactions:
                     
                     {f'''
                     <div class="section-title">Largest Single Expense</div>
-                    <div style="border: 1px dashed #e5e7eb; border-radius: 6px; padding: 12px; font-size: 12px; background-color: #fafafa;">
-                        <div style="font-weight: 700; color: #111827;">{biggest_tx['description']}</div>
-                        <div style="margin-top: 4px; color: #4b5563;">
-                            <span>Date: {biggest_tx['date']}</span> | 
-                            <span>Category: {biggest_tx['category']}</span>
-                        </div>
-                        <div style="font-size: 16px; font-weight: 800; color: #dc2626; margin-top: 6px;">
-                            {fmt_currency(abs(biggest_tx['amount']))}
-                        </div>
-                    </div>
+                    <table style="width: 100%; border-collapse: collapse; border: 1px dashed #e5e7eb; background-color: #fafafa; font-size: 12px;">
+                        <tr>
+                            <td style="padding: 12px;">
+                                <div style="font-weight: 700; color: #111827; margin: 0 0 4px 0;">{biggest_tx['description']}</div>
+                                <div style="color: #4b5563; font-size: 11px; margin: 0 0 6px 0;">
+                                    <span>Date: {biggest_tx['date']}</span> | 
+                                    <span>Category: {biggest_tx['category']}</span>
+                                </div>
+                                <div style="font-size: 16px; font-weight: 800; color: #dc2626; margin: 0;">
+                                    {fmt_currency(abs(biggest_tx['amount']))}
+                                </div>
+                            </td>
+                        </tr>
+                    </table>
                     ''' if biggest_tx else ''}
                 </td>
                 <!-- Spacing column -->
@@ -344,11 +363,12 @@ def generate_pdf_report(html_content: str) -> bytes:
     
     # 1. Remove print console control bar from PDF output
     html_content = re.sub(
-        r'<!-- Control bar .*?-->\s*<div class="no-print".*?</div>\s*</div>', 
+        r'<!-- Control bar .*?-->\s*<div class="no-print".*?</div>', 
         '', 
         html_content, 
         flags=re.DOTALL
     )
+
     
     # 2. Replace format metadata text to reflect PDF format
     html_content = html_content.replace(

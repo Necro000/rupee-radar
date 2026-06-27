@@ -1,13 +1,17 @@
 "use client";
 
-import React, { useState, useEffect, use } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useEffect, use, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Printer, ArrowLeft, RefreshCw, AlertCircle, FileText } from "lucide-react";
 import { api, SummaryResponse, Insight, Transaction } from "../../../../lib/api";
 
-export default function ReportPage({ params }: { params: Promise<{ sessionId: string }> }) {
+function ReportContent({ params }: { params: Promise<{ sessionId: string }> }) {
   const router = useRouter();
   const { sessionId } = use(params);
+
+  const searchParams = useSearchParams();
+  const fromDate = searchParams?.get("fromDate") || "";
+  const toDate = searchParams?.get("toDate") || "";
 
   const [summary, setSummary] = useState<SummaryResponse | null>(null);
   const [insights, setInsights] = useState<Insight[]>([]);
@@ -17,7 +21,7 @@ export default function ReportPage({ params }: { params: Promise<{ sessionId: st
 
   useEffect(() => {
     loadReportData();
-  }, [sessionId]);
+  }, [sessionId, fromDate, toDate]);
 
   const loadReportData = async () => {
     setLoading(true);
@@ -25,9 +29,9 @@ export default function ReportPage({ params }: { params: Promise<{ sessionId: st
     try {
       // 1. Fetch metrics, insights and all transactions in parallel
       const [summaryRes, insightsRes, txsRes] = await Promise.all([
-        api.getSummary(sessionId),
-        api.getInsights(sessionId),
-        api.getTransactions(sessionId, 1, 500) // Fetch up to 500 transactions for the ledger
+        api.getSummary(sessionId, fromDate || undefined, toDate || undefined),
+        api.getInsights(sessionId, fromDate || undefined, toDate || undefined),
+        api.getTransactions(sessionId, 1, 1000, undefined, undefined, fromDate || undefined, toDate || undefined) // Fetch up to 1000 transactions for the ledger
       ]);
 
       setSummary(summaryRes);
@@ -47,7 +51,10 @@ export default function ReportPage({ params }: { params: Promise<{ sessionId: st
 
   const handleDownloadPDF = () => {
     const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-    window.open(`${API_BASE_URL}/api/v1/sessions/${sessionId}/report?format=pdf`, "_blank");
+    let url = `${API_BASE_URL}/api/v1/sessions/${sessionId}/report?format=pdf`;
+    if (fromDate) url += `&fromDate=${fromDate}`;
+    if (toDate) url += `&toDate=${toDate}`;
+    window.open(url, "_blank");
   };
 
   const formatCurrency = (val: number) => {
@@ -147,6 +154,7 @@ export default function ReportPage({ params }: { params: Promise<{ sessionId: st
           
           <div className="text-left sm:text-right text-xs text-zinc-500 font-medium space-y-1">
             <div><strong>Session Ref:</strong> {sessionId}</div>
+            <div><strong>Period:</strong> {fromDate && toDate ? `${fromDate} to ${toDate}` : fromDate ? `From ${fromDate}` : toDate ? `Until ${toDate}` : "All Time Data"}</div>
             <div><strong>Report Type:</strong> Audit Snapshot</div>
             <div><strong>Generated At:</strong> {new Date().toLocaleDateString("en-IN")}</div>
           </div>
@@ -314,5 +322,20 @@ export default function ReportPage({ params }: { params: Promise<{ sessionId: st
         }
       `}</style>
     </div>
+  );
+}
+
+export default function ReportPage({ params }: { params: Promise<{ sessionId: string }> }) {
+  return (
+    <Suspense fallback={
+      <div className="flex-1 bg-zinc-950 flex flex-col items-center justify-center min-h-screen text-zinc-400">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-10 w-10 border-4 border-emerald-500/25 border-t-emerald-400 rounded-full animate-spin"></div>
+          <span className="text-sm font-semibold tracking-wider uppercase text-zinc-500">Compiling Printable Report...</span>
+        </div>
+      </div>
+    }>
+      <ReportContent params={params} />
+    </Suspense>
   );
 }

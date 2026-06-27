@@ -344,8 +344,17 @@ export const api = {
   /**
    * Fetch financial insights
    */
-  async getInsights(sessionId: string): Promise<Insight[]> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/sessions/${sessionId}/insights`, {
+  async getInsights(sessionId: string, fromDate?: string, toDate?: string): Promise<Insight[]> {
+    let url = `${API_BASE_URL}/api/v1/sessions/${sessionId}/insights`;
+    const params = new URLSearchParams();
+    if (fromDate) params.append('fromDate', fromDate);
+    if (toDate) params.append('toDate', toDate);
+    const queryString = params.toString();
+    if (queryString) {
+      url += `?${queryString}`;
+    }
+
+    const response = await fetch(url, {
       method: 'GET',
       headers: {
         'Accept': 'application/json',

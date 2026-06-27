@@ -12,7 +12,8 @@ import {
   ArrowLeft,
   RefreshCw,
   AlertCircle,
-  FileText
+  FileText,
+  Printer
 } from "lucide-react";
 import { api, SummaryResponse, Insight } from "../../../lib/api";
 import SummaryCards from "../../../components/dashboard/SummaryCards";
@@ -61,7 +62,7 @@ export default function DashboardPage({ params }: { params: Promise<{ sessionId:
       // 2. Fetch summary and insights in parallel
       const [summaryRes, insightsRes] = await Promise.all([
         api.getSummary(sessionId, fromDate || undefined, toDate || undefined),
-        api.getInsights(sessionId)
+        api.getInsights(sessionId, fromDate || undefined, toDate || undefined)
       ]);
 
       setSummary(summaryRes);
@@ -130,7 +131,22 @@ export default function DashboardPage({ params }: { params: Promise<{ sessionId:
 
   const handleExportPDF = () => {
     const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-    window.open(`${API_BASE_URL}/api/v1/sessions/${sessionId}/report?format=pdf`, "_blank");
+    let url = `${API_BASE_URL}/api/v1/sessions/${sessionId}/report?format=pdf`;
+    if (fromDate) url += `&fromDate=${fromDate}`;
+    if (toDate) url += `&toDate=${toDate}`;
+    window.open(url, "_blank");
+  };
+
+  const handlePrintReport = () => {
+    let url = `/dashboard/${sessionId}/report`;
+    const params = new URLSearchParams();
+    if (fromDate) params.append('fromDate', fromDate);
+    if (toDate) params.append('toDate', toDate);
+    const queryString = params.toString();
+    if (queryString) {
+      url += `?${queryString}`;
+    }
+    window.open(url, "_blank");
   };
 
   if (loading) {
@@ -195,6 +211,15 @@ export default function DashboardPage({ params }: { params: Promise<{ sessionId:
           >
             <FileText className="w-3.5 h-3.5" />
             <span>Export PDF</span>
+          </button>
+
+          <button
+            onClick={handlePrintReport}
+            className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:border-emerald-500/40 hover:bg-emerald-500/15 transition flex items-center gap-1.5 text-xs font-semibold cursor-pointer"
+            title="Open printable report view"
+          >
+            <Printer className="w-3.5 h-3.5" />
+            <span>Print Report</span>
           </button>
 
           <button

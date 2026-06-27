@@ -608,14 +608,24 @@ def api_get_summary(
     return summary
 
 @router.get("/{session_id}/insights", response_model=List[InsightResponseSchema])
-def api_get_insights(session_id: str, db: Session = Depends(get_db)):
+def api_get_insights(
+    session_id: str,
+    fromDate: Optional[str] = Query(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$"),
+    toDate: Optional[str] = Query(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$"),
+    db: Session = Depends(get_db)
+):
     """Retrieve ranked financial insights for this session."""
     session = get_session(db, session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
         
-    # Get all transactions for the session to compute overall metrics first
-    transactions = db.query(DBTransaction).filter(DBTransaction.session_id == session_id).all()
+    query = db.query(DBTransaction).filter(DBTransaction.session_id == session_id)
+    if fromDate:
+        query = query.filter(DBTransaction.date >= fromDate)
+    if toDate:
+        query = query.filter(DBTransaction.date <= toDate)
+        
+    transactions = query.all()
     
     from services.metrics.calculator import MetricsCalculator
     calculator = MetricsCalculator()
@@ -631,6 +641,8 @@ def api_get_insights(session_id: str, db: Session = Depends(get_db)):
 def api_get_report(
     session_id: str,
     format: str = Query(default="html"),
+    fromDate: Optional[str] = Query(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$"),
+    toDate: Optional[str] = Query(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$"),
     db: Session = Depends(get_db)
 ):
     """Retrieve a printable standalone HTML report or download a PDF report for this session."""
@@ -638,8 +650,13 @@ def api_get_report(
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
         
-    # Get all transactions for the session to compute overall metrics first
-    transactions = db.query(DBTransaction).filter(DBTransaction.session_id == session_id).all()
+    query = db.query(DBTransaction).filter(DBTransaction.session_id == session_id)
+    if fromDate:
+        query = query.filter(DBTransaction.date >= fromDate)
+    if toDate:
+        query = query.filter(DBTransaction.date <= toDate)
+        
+    transactions = query.all()
     
     from services.metrics.calculator import MetricsCalculator
     calculator = MetricsCalculator()
@@ -650,7 +667,7 @@ def api_get_report(
     insights = generator.generate_insights(summary)
     
     from services.report.generator import generate_html_report
-    html_content = generate_html_report(session_id, summary, transactions, insights)
+    html_content = generate_html_report(session_id, summary, transactions, insights, fromDate, toDate)
     
     if format.lower() == "pdf":
         from services.report.generator import generate_pdf_report
